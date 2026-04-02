@@ -1,5 +1,7 @@
 # retest
 
+[![npm](https://img.shields.io/npm/v/retest)](https://www.npmjs.com/package/retest) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 `retest` is a small CLI that uses static import graph analysis to find the test files affected by a changed source file.
 
 It scans `src/` and `test/`, resolves relative imports, builds a directed graph, and then walks the reverse graph from the changed file upward until it reaches tests.
