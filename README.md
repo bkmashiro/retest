@@ -30,6 +30,8 @@ retest --changed src/auth.ts --coverage
 retest --watch src/
 retest --changed src/auth.ts --runner "node --import tsx/esm --test"
 retest --changed src/auth.ts --json
+retest --changed src/auth.ts --impact-score
+retest --ci-config github-actions
 ```
 
 ### Options
@@ -44,6 +46,8 @@ retest [options]
   --runner <cmd>     Custom test runner command (default: "node --import tsx/esm --test")
   --cwd <path>       Project directory (default: cwd)
   --json             JSON output (list of affected test files)
+  --impact-score     Show a risk score for each changed file
+  --ci-config <provider> Generate CI config for github-actions or gitlab
   --test-dir <dir>   Where tests live (default: test/)
   --src-dir <dir>    Where source lives (default: src/)
 ```
@@ -86,6 +90,30 @@ Coverage for src/auth.ts:
   Lines:    87.5% (28/32)
   Branches: 75.0% (6/8)
   Uncovered: lines 45-48, 67
+```
+
+```text
+$ retest --changed src/auth.ts --impact-score
+Impact analysis for src/auth.ts:
+
+Impact score: 50/100 (MEDIUM)
+  - 3 test files depend on this file
+  - 1 source file directly imports it
+  - 3 additional files depend on it transitively
+  - src/auth.ts is imported by 25% of source files (1/4)
+
+Affected tests (3):
+  test/api.test.ts             (1 hop, 1 test case)
+  test/app.test.ts             (2 hops, 1 test case)
+  test/auth.test.ts            (direct, 1 test case)
+
+Total: 3 test cases to run
+```
+
+```text
+$ retest --ci-config github-actions
+Generated .github/workflows/smart-test.yml:
+  Uses retest to only run tests affected by changed files and falls back to the full suite on main branch
 ```
 
 ```text

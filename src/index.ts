@@ -10,6 +10,8 @@ import { Command } from "commander";
 import { findAffectedTests } from "./finder.js";
 import { formatReport } from "./formatter.js";
 import { buildImportGraph, walkCodeFiles } from "./graph.js";
+import { generateCiConfig, formatCiGenerationMessage, type CiProvider } from "./ci-config.js";
+import { analyzeImpact, formatImpactReport } from "./impact.js";
 import { formatCoverageSummary, runTests, runTestsWithCoverage } from "./runner.js";
 import { watchAndRun } from "./watcher.js";
 
@@ -27,6 +29,8 @@ interface CliOptions {
   json?: boolean;
   testDir: string;
   srcDir: string;
+  impactScore?: boolean;
+  ciConfig?: CiProvider;
 }
 
 async function getChangedFiles(options: CliOptions): Promise<string[]> {
@@ -68,6 +72,8 @@ async function main(): Promise<void> {
     .option("--runner <cmd>", "Custom test runner command", DEFAULT_RUNNER)
     .option("--cwd <path>", "Project directory", process.cwd())
     .option("--json", "JSON output (list of affected test files)")
+    .option("--impact-score", "Show a risk score for each changed file")
+    .option("--ci-config <provider>", "Generate CI config for github-actions or gitlab")
     .option("--test-dir <dir>", "Where tests live", "test")
     .option("--src-dir <dir>", "Where source lives", "src");
 
@@ -90,6 +96,16 @@ async function main(): Promise<void> {
     return;
   }
 
+  if (options.ciConfig) {
+    if (options.ciConfig !== "github-actions" && options.ciConfig !== "gitlab") {
+      program.error("--ci-config must be either github-actions or gitlab.");
+    }
+
+    const generated = await generateCiConfig(options.cwd, options.ciConfig);
+    process.stdout.write(`${formatCiGenerationMessage(generated, options.cwd)}\n`);
+    return;
+  }
+
   if (!options.changed && !options.gitDiff) {
     program.error("Either --changed <file> or --git-diff is required.");
   }
@@ -101,10 +117,19 @@ async function main(): Promise<void> {
     testDir: options.testDir,
   });
   const testRoot = path.resolve(options.cwd, options.testDir);
+  const srcRoot = path.resolve(options.cwd, options.srcDir);
   const allTests = await walkCodeFiles(testRoot);
   const affected = findAffectedTests(graph, changedFiles, testRoot);
   const affectedPaths = new Set(affected.map((item) => item.testFile));
   const unaffected = allTests.filter((testFile) => !affectedPaths.has(testFile));
+
+  if (options.impactScore) {
+    const reports = await Promise.all(
+      changedFiles.map((changedFile) => analyzeImpact(graph, changedFile, affected, allTests, srcRoot)),
+    );
+    process.stdout.write(`${reports.map((report) => formatImpactReport(report, options.cwd)).join("\n\n")}\n`);
+    return;
+  }
 
   if (options.json) {
     process.stdout.write(
