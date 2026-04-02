@@ -1,6 +1,6 @@
 {
   "name": "retest",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Find and run only the tests affected by changed source files using static import graph analysis.",
   "type": "module",
   "bin": {
