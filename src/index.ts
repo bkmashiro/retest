@@ -10,7 +10,8 @@ import { Command } from "commander";
 import { findAffectedTests } from "./finder.js";
 import { formatReport } from "./formatter.js";
 import { buildImportGraph, walkCodeFiles } from "./graph.js";
-import { runTests } from "./runner.js";
+import { formatCoverageSummary, runTests, runTestsWithCoverage } from "./runner.js";
+import { watchAndRun } from "./watcher.js";
 
 const execFileAsync = promisify(execFile);
 const DEFAULT_RUNNER = "node --import tsx/esm --test";
@@ -19,6 +20,8 @@ interface CliOptions {
   changed?: string;
   gitDiff?: boolean;
   run?: boolean;
+  watch?: string | boolean;
+  coverage?: boolean;
   runner: string;
   cwd: string;
   json?: boolean;
@@ -60,6 +63,8 @@ async function main(): Promise<void> {
     .option("--changed <file>", "Source file that changed")
     .option("--git-diff", "Auto-detect changed files from `git diff --name-only HEAD`")
     .option("--run", "Actually run the affected tests")
+    .option("--watch [path]", "Watch a source directory for changes and rerun affected tests")
+    .option("--coverage", "Show coverage for changed files after running affected tests")
     .option("--runner <cmd>", "Custom test runner command", DEFAULT_RUNNER)
     .option("--cwd <path>", "Project directory", process.cwd())
     .option("--json", "JSON output (list of affected test files)")
@@ -69,6 +74,21 @@ async function main(): Promise<void> {
   program.parse(process.argv);
   const options = program.opts<CliOptions>();
   options.cwd = path.resolve(options.cwd);
+
+  if (options.watch) {
+    const watchTarget =
+      typeof options.watch === "string" && options.watch.length > 0
+        ? options.watch
+        : options.srcDir;
+    await watchAndRun(watchTarget, {
+      cwd: options.cwd,
+      srcDir: options.srcDir,
+      testDir: options.testDir,
+      runner: options.runner,
+      coverage: options.coverage,
+    });
+    return;
+  }
 
   if (!options.changed && !options.gitDiff) {
     program.error("Either --changed <file> or --git-diff is required.");
@@ -103,13 +123,23 @@ async function main(): Promise<void> {
     );
   }
 
-  if (options.run) {
-    const code = await runTests(
-      options.runner,
-      affected.map((item) => path.relative(options.cwd, item.testFile)),
-      options.cwd,
-    );
-    process.exitCode = code;
+  if (options.run || options.coverage) {
+    const testFiles = affected.map((item) => path.relative(options.cwd, item.testFile));
+    if (options.coverage) {
+      const result = await runTestsWithCoverage(
+        options.runner,
+        testFiles,
+        options.cwd,
+        changedFiles,
+      );
+      for (const summary of result.summaries) {
+        process.stdout.write(`\n${formatCoverageSummary(summary, options.cwd)}\n`);
+      }
+      process.exitCode = result.exitCode;
+      return;
+    }
+
+    process.exitCode = await runTests(options.runner, testFiles, options.cwd);
   }
 }
 

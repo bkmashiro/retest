@@ -26,6 +26,8 @@ node dist/index.js --changed src/auth.ts
 retest --changed src/auth.ts
 retest --git-diff
 retest --git-diff --run
+retest --changed src/auth.ts --coverage
+retest --watch src/
 retest --changed src/auth.ts --runner "node --import tsx/esm --test"
 retest --changed src/auth.ts --json
 ```
@@ -37,6 +39,8 @@ retest [options]
   --changed <file>   Source file that changed (required or use --git-diff)
   --git-diff         Auto-detect changed files from `git diff --name-only HEAD`
   --run              Actually run the affected tests
+  --watch [path]     Watch a source directory for changes and rerun affected tests
+  --coverage         Show coverage for changed files after running affected tests
   --runner <cmd>     Custom test runner command (default: "node --import tsx/esm --test")
   --cwd <path>       Project directory (default: cwd)
   --json             JSON output (list of affected test files)
@@ -71,6 +75,27 @@ Unaffected (skipping):
 
 Run: node --import tsx/esm --test test/auth.test.ts test/api.test.ts test/app.test.ts
      (3 of 4 test files)
+```
+
+```text
+$ retest --changed src/auth.ts --coverage
+Analyzing import graph...
+...
+
+Coverage for src/auth.ts:
+  Lines:    87.5% (28/32)
+  Branches: 75.0% (6/8)
+  Uncovered: lines 45-48, 67
+```
+
+```text
+$ retest --watch src/
+Watching src/ for changes...
+
+[14:23:15] Changed: src/auth.ts
+Affected tests: test/auth.test.ts, test/api.test.ts
+Running 2 tests...
+All passed. Watching...
 ```
 
 ## Compared with `jest --onlyChanged`
